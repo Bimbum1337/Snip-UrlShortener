@@ -5,4 +5,14 @@
     <Project Path="src/UrlShortener.Infrastructure/UrlShortener.Infrastructure.csproj" />
     <Project Path="src/UrlShortener.Api/UrlShortener.Api.csproj" />
   </Folder>
+  <Folder Name="/docker/">
+    <File Path="compose.yaml" />
+    <File Path=".dockerignore" />
+    <File Path=".env.example" />
+    <File Path="src/UrlShortener.Api/Dockerfile" />
+    <File Path="frontend/Dockerfile" />
+    <File Path="frontend/nginx.conf" />
+    <File Path="docs/DOCKER.md" />
+    <File Path="docs/DOCKER-REFERENCE.md" />
+  </Folder>
 </Solution>
