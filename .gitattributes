@@ -1,0 +1,29 @@
+# Let Git normalise line endings in the repository, and check files out with the
+# platform's native endings.
+* text=auto
+
+# These are read by Linux inside containers, or by shells. CRLF breaks them:
+# a Dockerfile line ending in \r makes `RUN foo \` continue wrongly, and nginx
+# rejects directives with a trailing \r. Force LF regardless of platform.
+Dockerfile      text eol=lf
+Dockerfile.*    text eol=lf
+*.dockerignore  text eol=lf
+.dockerignore   text eol=lf
+compose.yaml    text eol=lf
+compose.yml     text eol=lf
+*.conf          text eol=lf
+*.sh            text eol=lf
+.env.example    text eol=lf
+
+# Windows-only files stay CRLF.
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Never touch binaries.
+*.png  binary
+*.jpg  binary
+*.svg  text
+*.ico  binary
+*.pdf  binary
+*.dll  binary
