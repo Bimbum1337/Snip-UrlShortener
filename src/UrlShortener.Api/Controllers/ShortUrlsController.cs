@@ -13,9 +13,6 @@ public sealed class ShortUrlsController(IShortUrlService shortUrls) : BaseApiCon
     public const string GetByCodeRouteName = "GetShortUrlByCode";
 
     [HttpPost]
-    [ProducesResponseType(StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<ShortUrlResponse>> Create(
         [FromBody] CreateShortUrlRequest request,
         CancellationToken cancellationToken)
@@ -29,7 +26,6 @@ public sealed class ShortUrlsController(IShortUrlService shortUrls) : BaseApiCon
     }
 
     [HttpGet]
-    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResult<ShortUrlResponse>>> List(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
@@ -53,15 +49,10 @@ public sealed class ShortUrlsController(IShortUrlService shortUrls) : BaseApiCon
     }
 
     [HttpGet("{code}", Name = GetByCodeRouteName)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ShortUrlResponse>> GetByCode(string code, CancellationToken cancellationToken)
         => ToActionResult(await shortUrls.GetByCodeAsync(code, cancellationToken));
 
     [HttpPatch("{code}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ShortUrlResponse>> Update(
         string code,
         [FromBody] UpdateShortUrlRequest request,
@@ -69,13 +60,10 @@ public sealed class ShortUrlsController(IShortUrlService shortUrls) : BaseApiCon
         => ToActionResult(await shortUrls.UpdateAsync(code, request, cancellationToken));
 
     [HttpDelete("{code}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Delete(string code, CancellationToken cancellationToken)
         => ToActionResult(await shortUrls.DeleteAsync(code, cancellationToken));
 
     [HttpGet("alias-available/{alias}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<AliasAvailabilityResponse>> CheckAlias(
         string alias,
         CancellationToken cancellationToken)

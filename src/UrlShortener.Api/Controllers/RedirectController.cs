@@ -10,9 +10,6 @@ namespace UrlShortener.Api.Controllers;
 public sealed class RedirectController(IRedirectService redirects) : BaseApiController
 {
     [HttpGet("/{code}")]
-    [ProducesResponseType(StatusCodes.Status302Found)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult> Follow(string code, CancellationToken cancellationToken)
     {
         var context = new VisitContext(
@@ -31,8 +28,6 @@ public sealed class RedirectController(IRedirectService redirects) : BaseApiCont
     }
 
     [HttpGet("/api/preview/{code}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RedirectTarget>> Preview(string code, CancellationToken cancellationToken)
         => ToActionResult(await redirects.PeekAsync(code, cancellationToken));
 }
