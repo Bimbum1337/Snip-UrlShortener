@@ -1,0 +1,39 @@
+## .NET
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+*.userprefs
+.vs/
+artifacts/
+
+## Logs
+Logs/
+*.log
+
+## Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+## Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.njsproj
+*.sln.docstates
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Secrets
+appsettings.*.local.json
+.env
+.env.*
+!.env.example
