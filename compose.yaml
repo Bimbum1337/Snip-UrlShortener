@@ -1,0 +1,169 @@
+# Docker Compose for UrlShortener.
+#
+# Built in 4 phases (see docs/DOCKER.md). You can run any phase on its own,
+# because Compose starts only the services you name plus their dependencies:
+#
+#   Phase 1  docker compose up sqlserver          # database only
+#   Phase 2  docker compose up api                # + API (pulls in sqlserver)
+#   Phase 3  docker compose up frontend           # + Vue app (pulls in api)
+#   Phase 4  docker compose up                    # everything, incl. Seq
+#
+# Every ${VAR} below comes from the `.env` file next to this one.
+
+services:
+  # ---------------------------------------------------------------------------
+  # PHASE 1 - the database
+  # ---------------------------------------------------------------------------
+  sqlserver:
+    # `image:` = pull a prebuilt image from a registry. Nothing to build.
+    image: mcr.microsoft.com/mssql/server:2022-latest
+
+    # Fixed name so `docker logs sqlserver` works without guessing.
+    container_name: urlshortener-sqlserver
+
+    # Environment variables configure the software inside the container.
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+      MSSQL_PID: Developer
+
+    # "HOST:CONTAINER". Left side is your machine, right side is inside the
+    # container. This line is ONLY needed so tools on your PC (SSMS, Azure Data
+    # Studio, `dotnet run` in phase 1) can reach the DB. Other containers do NOT
+    # need it - they talk over the internal network using the service name.
+    ports:
+      - "${SQLSERVER_PORT}:1433"
+
+    # A named volume keeps the database files alive when the container is
+    # deleted and recreated. Without this, `docker compose down` wipes your data.
+    volumes:
+      - mssql-data:/var/opt/mssql
+
+    # Compose polls this command until it succeeds. Other services can then wait
+    # for "healthy" instead of racing the database during its ~20s startup.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" -b
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # PHASE 4 - structured logging (declared here because the API depends on it)
+  # ---------------------------------------------------------------------------
+  seq:
+    image: datalust/seq:latest
+    container_name: urlshortener-seq
+
+    environment:
+      ACCEPT_EULA: "Y"
+
+      # Seq 2026.1+ REFUSES to start unless you make an explicit choice about
+      # authentication. Without one of these two settings the container crashes
+      # on first run with:
+      #   "No default admin password was supplied"
+      # and `restart: unless-stopped` then restarts it forever.
+      #
+      # This is a local dev log viewer, so we opt out of login entirely.
+      # To require a login instead, delete the line below and set:
+      #   SEQ_FIRSTRUN_ADMINPASSWORD: ${SEQ_ADMIN_PASSWORD}
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
+
+    # Seq serves both its web UI and its log-ingestion API on port 80 inside the
+    # container. We publish it on 5341, the conventional Seq port.
+    # UI: http://localhost:5341
+    ports:
+      - "${SEQ_PORT}:80"
+
+    # Ingested logs live here. Named volume = logs survive a container rebuild.
+    volumes:
+      - seq-data:/data
+
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # PHASE 2 - the ASP.NET Core API
+  # ---------------------------------------------------------------------------
+  api:
+    # `build:` = build an image from our own source instead of pulling one.
+    build:
+      # The build context is the REPO ROOT, not the API folder, because the
+      # Dockerfile needs Directory.Build.props and all four csproj files.
+      context: .
+      dockerfile: src/UrlShortener.Api/Dockerfile
+
+    container_name: urlshortener-api
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+
+      # NOTE: Kestrel listens on 8080 inside the container - that's the `8080` in
+      # the `ports:` mapping below. We don't set it here because the aspnet base
+      # image already does (ASPNETCORE_HTTP_PORTS=8080). Verify with:
+      #   docker image inspect urlshortener-api --format '{{.Config.Env}}'
+
+      # .NET config keys nest with a double underscore:
+      #   ConnectionStrings__DbConnectionString  ==  ConnectionStrings:DbConnectionString
+      # Env vars override appsettings.json, so nothing in that file has to change.
+      #
+      # Note the host is `sqlserver` - the SERVICE NAME. Compose runs a DNS
+      # server on the shared network that resolves service names to container
+      # IPs. And it's port 1433, the CONTAINER port, not ${SQLSERVER_PORT}.
+      ConnectionStrings__DbConnectionString: >-
+        Server=sqlserver,1433;Database=UrlShortenerDb;User Id=sa;
+        Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=true;
+        MultipleActiveResultSets=True;Encrypt=false
+
+      # Short links are handed to the browser, so this must be the HOST address.
+      Shortener__BaseUrl: http://localhost:${API_PORT}
+      Shortener__VisitorHashSalt: ${VISITOR_HASH_SALT}
+
+      # The frontend container is served from this origin.
+      Cors__AllowedOrigins__0: http://localhost:${FRONTEND_PORT}
+
+      # Phase 4: appsettings.json declares the Seq sink at WriteTo[2] pointing to
+      # localhost:5341 (right when you run the API on your PC). Inside Docker,
+      # "localhost" is the API container itself - so redirect it at the seq
+      # service. Only this one value is overridden, not the whole sink.
+      Serilog__WriteTo__2__Args__serverUrl: http://seq:80
+
+    ports:
+      - "${API_PORT}:8080"
+
+    # Don't start until SQL Server reports healthy; Seq only needs to exist.
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      seq:
+        condition: service_started
+
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # PHASE 3 - the Vue frontend, built to static files and served by nginx
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+
+    container_name: urlshortener-frontend
+
+    # nginx in this image listens on 8080 (see frontend/nginx.conf).
+    ports:
+      - "${FRONTEND_PORT}:8080"
+
+    depends_on:
+      - api
+
+    restart: unless-stopped
+
+# Named volumes. Docker manages the storage location; `docker volume ls` shows
+# them. They outlive containers - only `docker compose down -v` deletes them.
+volumes:
+  mssql-data:
+  seq-data:

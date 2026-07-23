@@ -1,0 +1,23 @@
+# Everything listed here is excluded from the build context - the tarball Docker
+# sends to the daemon before building. Keeping it small makes builds much faster
+# and stops stale host artefacts (bin/, obj/) from leaking into the image.
+
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+**/*.suo
+
+**/node_modules/
+frontend/dist/
+
+**/Logs/
+**/*.log
+
+.git/
+.gitignore
+.env
+.dockerignore
+compose.yaml
+docs/
+README.md
